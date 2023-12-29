@@ -1,0 +1,84 @@
+from google.colab import drive
+drive.mount('/content/drive')
+
+import pandas as pd
+import numpy as np
+import os
+import tensorflow as tf
+from matplotlib import pyplot
+
+df=pd.read_csv("/content/drive/MyDrive/fer2013/fer2013.csv")
+df
+
+df.emotion.unique()
+
+label_to_text={0:'Anger',1:'Disgust',2:'Fear',3:'Happy',4:'Sad',5:'Surprise',6:'Neutral'}
+
+pyplot.imshow(np.array(df.pixels.loc[0].split(' ')).reshape(48,48,1).astype('float'))
+
+img_array=df.pixels.apply(lambda x:np.array(x.split(' ')).reshape(48,48,1).astype('float32'))
+
+img_array=np.stack(img_array,axis=0)
+
+pyplot.imshow(img_array[2])
+
+labels=df.emotion.values
+len(labels)
+
+from sklearn.model_selection import train_test_split
+
+X_train,X_test,y_train,y_test=train_test_split(img_array,labels,test_size=0.2)
+
+X_train=X_train/255
+X_test=X_test/255
+
+
+import tensorflow as tf
+import numpy as np
+import os
+
+# Create the model
+model = tf.keras.models.Sequential([
+    tf.keras.layers.Conv2D(32, (3, 3), activation='relu', input_shape=(48, 48, 1)),
+    tf.keras.layers.MaxPool2D(2, 2),
+    tf.keras.layers.BatchNormalization(),
+
+    tf.keras.layers.Conv2D(64, (3, 3), activation='relu'),
+    tf.keras.layers.MaxPool2D(2, 2),
+    tf.keras.layers.BatchNormalization(),
+
+    tf.keras.layers.Conv2D(128, (3, 3), activation='relu'),
+    tf.keras.layers.MaxPool2D(2, 2),
+    tf.keras.layers.BatchNormalization(),
+
+    tf.keras.layers.Flatten(),
+
+    tf.keras.layers.Dense(128, activation='relu'),
+    tf.keras.layers.Dense(7, activation='softmax')
+])
+
+# Compile the model
+model.compile(optimizer=tf.keras.optimizers.RMSprop(learning_rate=0.0001),
+              loss='sparse_categorical_crossentropy',
+              metrics=['accuracy'])
+
+# Create the checkpoint directory if it doesn't exist
+try:
+    os.mkdir('checkpoint')
+except FileExistsError:
+    pass
+
+# Define the checkpoint file path
+checkpoint_path = 'checkpoint/model_checkpoint.h5'
+
+# Create the ModelCheckpoint callback
+callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
+                                              monitor='val_accuracy',
+                                              verbose=1,
+                                              save_freq='epoch',
+                                              save_best_only=True,
+                                              save_weights_only=False,
+                                              mode='max')
+
+# Train the model
+model.fit(X_train, y_train, epochs=50, validation_split=0.2, callbacks=[callback])
